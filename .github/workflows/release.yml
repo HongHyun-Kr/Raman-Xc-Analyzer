@@ -1,0 +1,42 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash build.sh --zip
+      - uses: actions/upload-artifact@v4
+        with: { name: mac, path: dist/*.zip }
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - run: dotnet build win/RamanXcAnalyzer.csproj -c Release -o out/RamanXcAnalyzer
+      - name: Zip
+        shell: pwsh
+        run: |
+          $v = ($env:GITHUB_REF_NAME).TrimStart('v')
+          Compress-Archive -Path out/RamanXcAnalyzer/* -DestinationPath "RamanXcAnalyzer-$v-Windows.zip"
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: '*.zip' }
+
+  release:
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: assets, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*.zip
+          body_path: RELEASE_NOTES.md
